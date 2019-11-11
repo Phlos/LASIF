@@ -38,7 +38,7 @@ def plot_events(events, map_object, beachball_size=0.02):
     return beachballs
 
 
-def plot_raydensity(map_object, station_events, domain):
+def plot_raydensity(map_object, station_events, domain, return_data=False):
     """
     Create a ray-density plot for all events and all stations.
 
@@ -190,7 +190,7 @@ def plot_raydensity(map_object, station_events, domain):
     cmap._lut[:120, -1] = np.linspace(0, 1.0, 120) ** 2
 
     # Slightly change the appearance of the map so it suits the rays.
-    map_object.fillcontinents(color='#dddddd', lake_color='#dddddd', zorder=2)
+    # map_object.fillcontinents(color='#dddddd', lake_color='#dddddd', zorder=2)
 
     lngs, lats = collected_bins.coordinates
     # Rotate back if necessary!
@@ -204,8 +204,17 @@ def plot_raydensity(map_object, station_events, domain):
                           zorder=10)
     # Draw the coastlines so they appear over the rays. Otherwise things are
     # sometimes hard to see.
-    map_object.drawcoastlines(zorder=3)
-    map_object.drawcountries(linewidth=0.2, zorder=3)
+    # map_object.drawcoastlines(zorder=3)
+    # map_object.drawcountries(linewidth=0.2, zorder=3)
+    map_object.fillcontinents(color=[0.7,0.7,0.7])
+
+    #plt.colorbar()
+
+    # added by Nienke 2019-01-14:
+    if return_data:
+        ret_dict = dict(lngs=lngs, lats=lats, data=data,
+                        raw_data_collected_bins=collected_bins)
+        return ret_dict
 
 
 def plot_stations_for_event(map_object, station_dict, event_info,
