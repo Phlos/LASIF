@@ -139,6 +139,15 @@ def adsrc_tf_phase_misfit(t, data, synthetic, min_period, max_period,
 
     i = ne.evaluate("sum(weight ** 2 * DP ** 2)")
 
+    # inserted by Nienke Blom, 22-11-2016
+    weighted_DP = ne.evaluate("weight * DP")
+    phasediff_integral = float(ne.evaluate("sum(weighted_DP * dnu * dt_new)"))
+    mean_delay = np.mean(weighted_DP)
+    wDP = weighted_DP.flatten()
+    wDP_thresh = wDP[abs(wDP) > 0.1 * max(wDP, key=lambda x: abs(x))]
+    median_delay = np.median(wDP_thresh)
+    max_delay = max(wDP, key=lambda x: abs(x))
+    
     phase_misfit = np.sqrt(i * dt_new * dnu)
 
     # Sanity check. Should not occur.
@@ -158,7 +167,14 @@ def adsrc_tf_phase_misfit(t, data, synthetic, min_period, max_period,
         ret_dict = {
             "adjoint_source": None,
             "misfit_value": phase_misfit,
-            "details": {"messages": messages}
+            "details": {"messages": messages,
+                        #"weighted_DP": weighted_DP,
+                        #"weight": weight,
+                        #"DP": DP,
+                        "mean_delay": mean_delay,	# added NAB 30-8-2017
+                        "phasediff_integral": phasediff_integral, 	# added NAB 22-11-2016, edited 30-8-2017
+                        "median_delay": median_delay, 	# added NAB 22-11-2016, edited 30-8-2017
+                        "max_delay": max_delay}	# added NAB 31-8-2017
         }
 
         return ret_dict
@@ -300,7 +316,15 @@ def adsrc_tf_phase_misfit(t, data, synthetic, min_period, max_period,
     ret_dict = {
         "adjoint_source": ad_src,
         "misfit_value": phase_misfit,
-        "details": {"messages": messages}
+        "details": {"messages": messages,
+                    #"weighted_DP": weighted_DP,
+                    #"weight": weight,
+                    #"DP": DP,
+                    "mean_delay": mean_delay,	# added NAB 30-8-2017
+                    "phasediff_integral": phasediff_integral, 	# added NAB 22-11-2016, edited 30-8-2017
+                    "median_delay": median_delay, 	# added NAB 22-11-2016, edited 30-8-2017
+                    "max_delay": max_delay}	# added NAB 31-8-2017
     }
-
+#    print "the phasedifference integral is "+str(ret_dict['details']['phasediff_integral'])
     return ret_dict
+
