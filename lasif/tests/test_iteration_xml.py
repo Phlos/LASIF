@@ -44,13 +44,6 @@ def test_reading_iteration_xml():
         "highpass_period": 100.0,
         "lowpass_period": 8.0
     }
-    assert iteration.rejection_criteria == {
-        "minimum_trace_length_in_s": 500.0,
-        "signal_to_noise": {
-            "test_interval_from_origin_in_s": 100.0,
-            "max_amplitude_ratio": 100.0
-        }
-    }
 
     # Test some settings. The rest should work just fine as this is parsed
     # by useing a recursive dictionary.
@@ -75,7 +68,6 @@ def test_reading_iteration_xml():
 
     event_1 = iteration.events["GCMT_event_TURKEY_Mag_5.9_2011-5-19-20-15"]
     assert event_1["event_weight"] == 1.0
-    assert event_1["time_correction_in_s"] == 0.0
     stations = event_1["stations"]
     assert len(stations) == 8
 
@@ -85,8 +77,6 @@ def test_reading_iteration_xml():
 
     assert set([_i["station_weight"] for _i in stations.values()]) == \
         set([1.0])
-    assert set([_i["time_correction_in_s"] for _i in stations.values()]) == \
-        set([0.0])
 
     # Test reading of comments for single events and stations.
     event_with_comments = iteration.events[

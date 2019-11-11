@@ -1,3 +1,14 @@
+.. centered:: Last updated on *August 12th 2016*.
+
+.. note::
+
+    The following links shows the example project as it should be just before
+    step 2. You can use this to check your progress or restart the tutorial at
+    this very point.
+
+    `After Step 2: Creating a new Project <https://github.com/krischer/LASIF_Tutorial/tree/after_step_2_creating_a_new_project>`_
+
+
 Seismic Events
 --------------
 Once the domain has been adjusted to your needs, you need to tell **LASIF**
@@ -7,7 +18,7 @@ valid QuakeML 1.2 file at the correct location.
 All events have to be stored in the ``EVENTS`` subfolder of the project. They
 have to be QuakeML 1.2 files with full moment tensor information.
 
-LASIF provides some convenience methods for this purpose. One can leverage the
+LASIF provides some convenience methods for this purpose. One can make use of the
 `IRIS SPUD service <http://www.iris.edu/spud/momenttensor>`_ to get GlobalCMT
 events.  Simply search for an event on their webpage and copy the event url.
 The ``lasif add_spud_event`` command will then grab the QuakeML file from the
@@ -38,12 +49,12 @@ project is the ``lasif list_events`` command.
     $ lasif list_events
 
     2 events in project:
-    +------------------------------------------------------------+--------------------------+---------------------+
-    | Event Name                                                 |  Lat/Lng/Depth(km)/Mag   | # raw/preproc/synth |
-    +------------------------------------------------------------+--------------------------+---------------------+
-    | GCMT_event_NORTHERN_ITALY_Mag_4.9_2000-8-21-17             |   44.9 / 8.5  / 10 / 4.9 |    0 /     0 /    0 |
-    | GCMT_event_NORTHWESTERN_BALKAN_REGION_Mag_5.9_1980-5-18-20 |   43.3 / 20.8 /  9 / 5.9 |    0 /     0 /    0 |
-    +------------------------------------------------------------+------------------------+-----------------------+
+    +------------------------------------------------------------+-----------------------------+
+    | Event Name                                                 |    Lat/Lng/Depth(km)/Mag    |
+    +------------------------------------------------------------+-----------------------------+
+    | GCMT_event_NORTHERN_ITALY_Mag_4.9_2000-8-21-17             |   44.9 /    8.5 /  15 / 4.9 |
+    | GCMT_event_NORTHWESTERN_BALKAN_REGION_Mag_5.9_1980-5-18-20 |   43.4 /   21.4 /  10 / 5.9 |
+    +------------------------------------------------------------+-----------------------------+
 
 You will notice that events are identified via their filename minus the
 extension. This is an easy and flexible solution enabling you to tag the events
@@ -55,7 +66,9 @@ feel that event renaming is a necessary feature please file an issue on Github
 so that the authors can add a proper event renaming function.
 
 The ``lasif plot_events`` command will show a map with all events currently
-part of the project.
+part of the project. With the same command, you can get histograms of depth
+distribution and origin time distribution by appending ``--type depth`` or
+``--type time``, respectively.
 
 .. code-block:: bash
 
@@ -112,7 +125,7 @@ part of the project.
     lasif.visualization.plot_events(events, bmap)
 
 
-The ``lasif event_info`` command is your friend if you desire more information
+The ``lasif event_info`` command is your friend if you want more information
 about a certain event:
 
 .. code-block:: bash
@@ -126,17 +139,43 @@ about a certain event:
     Station and waveform information available at 0 stations. Use '-v' to print them.
 
 
-The information given with this command will be the one LASIF uses. This is
-useful if the event has more then one origin and you want to know which one
-LASIF actually uses. Notice that the event currently has no data associated
+The information given with this command will be what **LASIF** uses. This is
+useful if the event has more than one origin and you want to know which one
+is actually used by **LASIF**. Notice that the event currently has no data associated
 with it. We will fix this in the next section.
+
+
+Automatic Event Selection
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Selecting events becomes tedious when selecting a larger number of events. Thus
+**LASIF** comes with an automatic routine to select events from the GCMT
+catalog, the ``lasif add_gcmt_events`` command. Arguments are number of events
+to select, minimum magnitude, maximum magnitude, and the minimum distance
+between two events in kilometers. See its help method for more details.
+
+It will select events in an optimally distributed fashion by successively
+adding events that have the largest distance to the next closest station,
+approximating a Poisson disc distribution.
+
+.. code-block:: bash
+
+    $ lasif add_gcmt_events 40 5 6.5 10
+
+    LASIF currently contains GCMT data from 2005 to 2016/2.
+    ...
+    Selected 40 events.
+    Written EVENTS/GCMT_event_...
+    ...
+
+
 
 .. note::
 
     You do not need to add all events you plan to use in the inversion at the
     beginning. Only add those you want to use for the very first inversion.
-    LASIF is rather flexible and enables you to use different events, data,
-    weighting schemes, ... for every iteration. It will keep track of what
+    **LASIF** is rather flexible and enables you to use different events, data,
+    weighting schemes, etc. for every iteration. It will keep track of what
     actually happened during each iteration so the project gains
     **reproducibility and provenance**.
 

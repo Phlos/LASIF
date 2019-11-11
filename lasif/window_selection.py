@@ -229,6 +229,7 @@ def _log_window_selection(tr_id, msg):
     """
     print "[Window selection for %s] %s" % (tr_id, msg)
 
+
 # Dictionary to cache the TauPyModel so there is no need to reinitialize it
 # each time which is a fairly expensive operation.
 TAUPY_MODEL_CACHE = {}
@@ -450,7 +451,7 @@ def select_windows(data_trace, synthetic_trace, event_latitude,
 
         plt.plot(times, data, color="black", label="data", lw=1.5)
         plt.plot(synthetic_trace.times(), synth, color="#e41a1c",
-                 label="synthetics",  lw=1.5)
+                 label="synthetics", lw=1.5)
 
         # Symmetric around y axis.
         middle = data.mean()

@@ -208,6 +208,12 @@ class Project(Component):
                     default_download_settings.update(cf_cache["config"][
                         "download_settings"])
                     self.config = cf_cache["config"]
+
+                    # Transition to newer LASIF version.
+                    if "misc_settings" not in self.config:
+                        self.config["misc_settings"] = {
+                            "time_frequency_adjoint_source_criterion": 7.0}
+
                     self.config["download_settings"] = \
                         default_download_settings
                     self.domain = cf_cache["domain"]
@@ -276,6 +282,18 @@ class Project(Component):
                     rotation.find("rotation_angle_in_degree").text),
                 boundary_width_in_degree=float(
                     bounds.find("boundary_width_in_degree").text))
+
+        # Misc settings.
+        misc = root.find("misc_settings")
+        if misc is not None:
+            self.config["misc_settings"] = {}
+            self.config["misc_settings"][
+                "time_frequency_adjoint_source_criterion"] = \
+                float(misc.find(
+                    "time_frequency_adjoint_source_criterion").text)
+        else:
+            self.config["misc_settings"] = {
+                "time_frequency_adjoint_source_criterion": 7.0}
 
         # Write cache file.
         cf_cache = {}
@@ -536,7 +554,10 @@ class Project(Component):
                     E.rotation_axis_x(str(1.0)),
                     E.rotation_axis_y(str(1.0)),
                     E.rotation_axis_z(str(1.0)),
-                    E.rotation_angle_in_degree(str(-45.0)))))
+                    E.rotation_angle_in_degree(str(-45.0)))),
+            E.misc_settings(
+                E.time_frequency_adjoint_source_criterion(str(7.0))
+            ))
 
         string_doc = etree.tostring(doc, pretty_print=True,
                                     xml_declaration=True, encoding="UTF-8")

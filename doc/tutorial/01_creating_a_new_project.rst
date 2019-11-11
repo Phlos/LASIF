@@ -1,3 +1,5 @@
+.. centered:: Last updated on *August 12th 2016*.
+
 Creating a New Project
 ----------------------
 
@@ -17,7 +19,7 @@ create a  new folder in whichever directory the command is executed in.
 This will create the following directory structure. A **LASIF** project is
 defined by the files it contains. All information it requires will be
 assembled from the available data. In the course of this tutorial you will
-learn what piece of data belongs where and how LASIF interacts with it.
+learn what piece of data belongs where and how **LASIF** interacts with it.
 
 .. code-block:: none
 
@@ -26,8 +28,17 @@ learn what piece of data belongs where and how LASIF interacts with it.
     │   ├── ADJOINT_SOURCES
     │   └── WINDOWS
     ├── CACHE
+    │   ├── config.xml_cache.pickle
+    │   ├── event_cache.sqlite
+    │   └── statistics
     ├── DATA
     ├── EVENTS
+    ├── FUNCTIONS
+    │   ├── __init__.py
+    │   ├── preprocessing_function.py
+    │   ├── process_synthetics.py
+    │   ├── source_time_function.py
+    │   └── window_picking_function.py
     ├── ITERATIONS
     ├── KERNELS
     ├── LOGS
@@ -41,6 +52,7 @@ learn what piece of data belongs where and how LASIF interacts with it.
     ├── WAVEFIELDS
     └── config.xml
 
+
 Configuration File
 ^^^^^^^^^^^^^^^^^^
 
@@ -48,34 +60,18 @@ Each project stores its configuration values in the **config.xml** file; the
 location of this file also determines the root folder of the project. It is
 a simple, self-explanatory XML format. Please refer to the comments in the
 XML file to infer the meaning of the different settings. Immediately after the
-project has been initialized it looks akin to the following:
+project has been initialized, it will resemble the following:
 
 .. code-block:: xml
 
     <?xml version='1.0' encoding='UTF-8'?>
     <lasif_project>
-      <!-- Name of the LASIF project. Choose one you like. -->
       <name>Tutorial</name>
-      <!-- Optional description -->
       <description></description>
-      <!-- Groups settings related to (meta)data downloading. -->
       <download_settings>
-        <!-- The next two segments determine how much data is downloaded around
-             the origin time of an event. Should be adjusted to suite the
-             scale of your inversion. -->
         <seconds_before_event>300</seconds_before_event>
         <seconds_after_event>3600</seconds_after_event>
-        <!-- The minimum distance between two stations. Any station closer
-             to another than this will not be downloaded. -->
         <interstation_distance_in_m>1000.0</interstation_distance_in_m>
-        <!-- Most stations have data from more than one channel which usually
-             contain the same data but sampled at different intervals. This
-             group determines which channels are given priority if  available.
-             If no item matches the available channels nothing will be
-             downloaded from that particular station. The channel names roughly
-             determine the sampling rate of the channel. Please refer to the
-             SEED manual for additional details. Uses unix shell style
-             wildcards. -->
         <channel_priorities>
           <priority>BH[Z,N,E]</priority>
           <priority>LH[Z,N,E]</priority>
@@ -83,8 +79,6 @@ project has been initialized it looks akin to the following:
           <priority>EH[Z,N,E]</priority>
           <priority>MH[Z,N,E]</priority>
         </channel_priorities>
-        <!-- The same for the location codes. Unfortunately no clear rule to
-             infer the most suitable location code from any station exists. -->
         <location_priorities>
           <priority></priority>
           <priority>00</priority>
@@ -94,13 +88,8 @@ project has been initialized it looks akin to the following:
           <priority>02</priority>
         </location_priorities>
       </download_settings>
-      <!-- These settings determine the inversion domain -->
       <domain>
-        <!-- Global domain or not. The other domain settings will be ignored
-             if this is set to true -->
         <global>false</global>
-        <!-- The bounds of the domain. Only taken into account if the domain
-             is not global. -->
         <domain_bounds>
           <minimum_longitude>-20</minimum_longitude>
           <maximum_longitude>20</maximum_longitude>
@@ -108,14 +97,8 @@ project has been initialized it looks akin to the following:
           <maximum_latitude>20</maximum_latitude>
           <minimum_depth_in_km>0.0</minimum_depth_in_km>
           <maximum_depth_in_km>200.0</maximum_depth_in_km>
-          <!-- The boundary with of the domain. Used to set the boundary
-               conditions (usually PMLs) in the solvers. Also it is made
-               sure that no data crosses this boundary. -->
           <boundary_width_in_degree>3.0</boundary_width_in_degree>
         </domain_bounds>
-        <!-- The rotation settings of the domain. Only taken into account if
-             the domain is not global. Set the rotation angle to zero to
-             work in a non-rotated domain. -->
         <domain_rotation>
           <rotation_axis_x>1.0</rotation_axis_x>
           <rotation_axis_y>1.0</rotation_axis_y>
@@ -123,16 +106,21 @@ project has been initialized it looks akin to the following:
           <rotation_angle_in_degree>-45.0</rotation_angle_in_degree>
         </domain_rotation>
       </domain>
+      <misc_settings>
+        <time_frequency_adjoint_source_criterion>
+            25.0
+        </time_frequency_adjoint_source_criterion>
+      </misc_settings>
     </lasif_project>
 
 The nature of SES3D's coordinate system has the effect that simulation is most
-efficient in equatorial regions. Thus it is oftentimes  advantageous to rotate
+efficient in equatorial regions. Thus it is often advantageous to rotate
 the frame of reference so that the simulation happens close to the equator.
-A one chunk simulation with SPECFEM GLOBE does not suffer from this limitation
-but a domain can still only be specified by minimum and maximum extends as it
+A one chunk simulation with SPECFEM3D GLOBE does not suffer from this limitation,
+but a domain can still only be specified by minimum and maximum extents as it
 works with spherical sections.
 **LASIF** first defines the simulation domain; the actual simulation happens
-there (only when using SES3D; SPECFEM GLOBE directly simulates in the
+there (only when using SES3D; SPECFEM3D GLOBE directly simulates in the
 rotated domain). Optional rotation parameters define the physical location of
 the domain. The coordinate system for the rotation parameters is described in
 :py:mod:`lasif.rotations`.  You will have to edit the ``config.xml`` file to
@@ -149,9 +137,9 @@ domain.
     A one chunk simulation in SPECFEM3D GLOBE is not exactly identical with the
     domain definition in LASIF. A SES3D (and LASIF) domain is defined in
     geographical coordinates whereas a cubed sphere chunk uses great circles on
-    all boundaries. This is not a big limitation just keep in mind that the
+    all boundaries. This is not a big limitation - just keep in mind that the
     domain in SPECFEM is a bit smaller at the corners than the LASIF domain. If
-    this becomes an issue let us know and we'll add some more logic to LASIF.
+    this becomes an issue, let us know and we'll add some more logic to LASIF.
 
 For this tutorial we are going to work in a rotated domain across Europe.
 Please change the ``config.xml`` file to reflect the following domain
@@ -164,10 +152,10 @@ settings.
 * Rotation axis: ``1.0, 1.0, 0.2``
 * Rotation angle: ``-65.0°``
 
-In general one should only work with data not affected by the boundary
+In general, one should only work with data not affected by the boundary
 conditions. SES3D utilizes perfectly matched layers boundary conditions (PML).
 It is not advisable to use data that traverses these layers. SES3D defaults
-to two layer but more are possible. For this tutorial we will only consider
+to two layers but more are possible. For this tutorial we will only consider
 data which is at least three elements away from the border in a an attempt
 to avoid unphysical influences of the boundary conditions. This amounts to
 ``2.5°``.
@@ -199,6 +187,6 @@ defined boundary width.
 
 .. note::
 
-    The map projection and zoom should automatically adjust so it is suitable
-    for the dimensions and location of the chosen domain. If that is not the
-    case please file an issue on the project's Github page.
+    The map projection and zoom should automatically adjust so that it is suitable
+    for the dimensions and location of the chosen domain. If this is not the
+    case, please file an issue on the project's Github page.

@@ -782,7 +782,8 @@ def lasif_plot_model(parser, args):
     parser.add_argument("component", type=str,
                         help="the component to plot")
     parser.add_argument("filename", type=str,
-                        help="output filename")
+                        help="Output filename. Use '-' to not write to a "
+                             "file but directly show the kernel.")
 
     args = parser.parse_args(args)
 
@@ -807,7 +808,10 @@ def lasif_plot_model(parser, args):
     m.colorbar(im, "right", size="3%", pad='2%')
     plt.title(str(args.depth) + ' km')
 
-    plt.savefig(args.filename, dpi=100)
+    if args.filename == "-":
+        plt.show()
+    else:
+        plt.savefig(args.filename, dpi=100)
     plt.close()
 
 
@@ -820,11 +824,13 @@ def lasif_plot_kernel(parser, args):
     this is one of the view commands that will work on data outside of LASIF.
     """
     parser.add_argument("folder", help="The folder containing the gradients.")
-    parser.add_argument("depth", type=float, help="the depth at which to plot")
+    parser.add_argument("depth", type=float,
+                        help="The depth at which to plot.")
     parser.add_argument("component", type=str,
-                        help="the component to plot")
+                        help="The component to plot.")
     parser.add_argument("filename", type=str,
-                        help="output filename")
+                        help="Output filename. Use '-' to not write to a "
+                             "file but directly show the kernel.")
 
     args = parser.parse_args(args)
 
@@ -849,7 +855,10 @@ def lasif_plot_kernel(parser, args):
     m.colorbar(im, "right", size="3%", pad='2%')
     plt.title(str(args.depth) + ' km')
 
-    plt.savefig(args.filename, dpi=100)
+    if args.filename == "-":
+        plt.show()
+    else:
+        plt.savefig(args.filename, dpi=100)
     plt.close()
 
 
@@ -956,10 +965,13 @@ def lasif_compare_misfits(parser, args):
 
     all_events = collections.defaultdict(list)
 
+    # Loop over each event.
     for _i, event in enumerate(events):
         # Get the windows from both.
         window_group_to = comm.windows.get(event, to_it)
         window_group_from = comm.windows.get(event, from_it)
+
+        event_weight = from_it.events[event]["event_weight"]
 
         # Get a list of channels shared amongst both.
         shared_channels = set(window_group_to.list()).intersection(
@@ -975,12 +987,21 @@ def lasif_compare_misfits(parser, args):
             pbar = progressbar.ProgressBar(
                 widgets=widgets, maxval=len(shared_channels)).start()
 
+        # Loop over each channel.
         for _i, channel in enumerate(shared_channels):
             if MPI.COMM_WORLD.rank == 0:
                 pbar.update(_i)
             window_collection_from = window_group_from.get(channel)
             window_collection_to = window_group_to.get(channel)
 
+            station_weight = from_it.events[event]["stations"][
+                ".".join(channel.split(".")[:2])]["station_weight"]
+
+            channel_misfit_from = 0
+            channel_misfit_to = 0
+            total_channel_weight = 0
+
+            # Loop over each window in that channel.
             for win_from in window_collection_from.windows:
                 try:
                     idx = window_collection_to.windows.index(win_from)
@@ -998,20 +1019,33 @@ def lasif_compare_misfits(parser, args):
 
                 try:
                     misfit_to = win_to.misfit_value
-                except LASIFAdjointSourceCalculationError:
-                    # Random penalty...but else to compare?
-                    misfit_to = 2.0 * misfit_from
-                except LASIFNotFoundError as e:
-                    print str(e)
-                    # Random penalty...but else to compare?
+                except Exception as e:
+                    print(e)
+                    # Random penalty...but how else to compare?
                     misfit_to = 2.0 * misfit_from
 
-                total_misfit_from += misfit_from
-                total_misfit_to += misfit_to
+                channel_misfit_from += misfit_from * win_from.weight
+                channel_misfit_to += misfit_to * win_from.weight
+                total_channel_weight += win_from.weight
 
-                all_events[event].append(
-                    (misfit_to - misfit_from) /
-                    (misfit_from * win_from.weight))
+            # Rare - but sometimes all windows for a certain channel fail
+            # the calculation.
+            if total_channel_weight == 0:
+                continue
+
+            # Make sure the misfits are consistent with the adjoint source
+            # calculations!
+            channel_misfit_from *= \
+                event_weight * station_weight / total_channel_weight
+            channel_misfit_to *= \
+                event_weight * station_weight / total_channel_weight
+
+            total_misfit_from += channel_misfit_from
+            total_misfit_to += channel_misfit_to
+
+            if (misfit_to - misfit_from) < -1.5:
+                print(event, channel, misfit_from - misfit_to)
+            all_events[event].append(misfit_to - misfit_from)
         if MPI.COMM_WORLD.rank == 0:
             pbar.finish()
 
@@ -1045,7 +1079,7 @@ def lasif_compare_misfits(parser, args):
     import numpy as np
 
     plt.figure(figsize=(20, 3 * len(all_events)))
-    plt.suptitle("Relative misfit change of measurements going from iteration"
+    plt.suptitle("Misfit change of measurements going from iteration"
                  " '%s' to iteration '%s'" % (from_it.name, to_it.name))
     for i, event_name in enumerate(sorted(all_events.keys())):
         values = np.array(all_events[event_name])
@@ -1053,7 +1087,7 @@ def lasif_compare_misfits(parser, args):
         colors[values > 0] = "red"
         plt.subplot(len(all_events), 1, i + 1)
         plt.bar(np.arange(len(values)), values, color=colors)
-        plt.ylabel("rel. change")
+        plt.ylabel("difference")
         plt.xlim(0, len(values) - 1)
         plt.xticks([])
         plt.title("%i measurements with identical windows for event '%s'" %

@@ -221,7 +221,8 @@ class RectangularSphericalSection(Domain):
 
         return True
 
-    def plot(self, plot_simulation_domain=False, ax=None, resolution=None):
+    def plot(self, plot_simulation_domain=False, ax=None, resolution=None,
+             skip_map_features=False):
         import matplotlib.pyplot as plt
         from mpl_toolkits.basemap import Basemap
 
@@ -272,7 +273,9 @@ class RectangularSphericalSection(Domain):
                         height=height, lat_0=self.center.latitude,
                         lon_0=self.center.longitude, ax=ax)
 
-        _plot_features(m, stepsize)
+        # This is fairly expensive and can thus be skipped.
+        if not skip_map_features:
+            _plot_features(m, stepsize)
 
         if plot_simulation_domain and self.rotation_angle_in_degree:
             _plot_lines(m, self.unrotated_border, color="red", lw=2,
@@ -349,7 +352,8 @@ class GlobalDomain(Domain):
         """
         return True
 
-    def plot(self, plot_simulation_domain=False, ax=None):
+    def plot(self, plot_simulation_domain=False, ax=None,
+             skip_map_features=False):
         """
         Global domain is plotted using an equal area Mollweide projection.
 
@@ -367,7 +371,8 @@ class GlobalDomain(Domain):
 
         # Equal area mollweide projection.
         m = Basemap(projection='moll', lon_0=0, resolution="c", ax=ax)
-        _plot_features(m, stepsize=45)
+        if not skip_map_features:
+            _plot_features(m, stepsize=45)
         return m
 
     def get_max_extent(self):
@@ -394,7 +399,7 @@ def _plot_features(map_object, stepsize):
     import matplotlib.pyplot as plt
 
     map_object.drawmapboundary(fill_color='#bbbbbb')
-    map_object.fillcontinents(color='white', lake_color='#cccccc', zorder=0)
+    map_object.fillcontinents(color='white', lake_color='#cccccc', zorder=1)
     plt.gcf().patch.set_alpha(0.0)
 
     # Style for parallels and meridians.

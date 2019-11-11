@@ -79,18 +79,6 @@ class Iteration(object):
         self.data_preprocessing["lowpass_period"] = \
             float(self._get(prep, "lowpass_period"))
 
-        self.rejection_criteria = {}
-        crits = root.find("rejection_criteria")
-        self.rejection_criteria["minimum_trace_length_in_s"] = \
-            float(self._get(crits, "minimum_trace_length_in_s"))
-        s_n = crits.find("signal_to_noise")
-        temp = {}
-        temp["test_interval_from_origin_in_s"] = \
-            float(self._get(s_n, "test_interval_from_origin_in_s"))
-        temp["max_amplitude_ratio"] = \
-            float(self._get(s_n, "max_amplitude_ratio"))
-        self.rejection_criteria["signal_to_noise"] = temp
-
         self.solver_settings = \
             _recursive_dict(root.find("solver_parameters"))[1]
 
@@ -100,8 +88,6 @@ class Iteration(object):
             comments = [_i.text for _i in event.findall("comment") if _i.text]
             self.events[event_name] = {
                 "event_weight": float(self._get(event, "event_weight")),
-                "time_correction_in_s": float(
-                    self._get(event, "time_correction_in_s")),
                 "stations": OrderedDict(),
                 "comments": comments}
             for station in event.findall("station"):
@@ -111,8 +97,6 @@ class Iteration(object):
                 self.events[event_name]["stations"][station_id] = {
                     "station_weight": float(self._get(station,
                                             "station_weight")),
-                    "time_correction_in_s": float(
-                        self._get(station, "time_correction_in_s")),
                     "comments": comments}
 
     def get_source_time_function(self):
@@ -267,21 +251,6 @@ class Iteration(object):
                 E.lowpass_period(
                     str(self.data_preprocessing["lowpass_period"]))
             ),
-            E.rejection_criteria(
-                E.minimum_trace_length_in_s(str(
-                    self.rejection_criteria["minimum_trace_length_in_s"]
-                )),
-                E.signal_to_noise(
-                    E.test_interval_from_origin_in_s(str(
-                        self.rejection_criteria["signal_to_noise"][
-                            "test_interval_from_origin_in_s"]
-                    )),
-                    E.max_amplitude_ratio(str(
-                        self.rejection_criteria["signal_to_noise"][
-                            "max_amplitude_ratio"]
-                    ))
-                )
-            ),
             E.solver_parameters(
                 E.solver(self.solver_settings["solver"]),
                 E.solver_settings(*solver_settings)
@@ -293,15 +262,12 @@ class Iteration(object):
             event = E.event(
                 E.event_name(key),
                 E.event_weight(str(value["event_weight"])),
-                E.time_correction_in_s(str(value["time_correction_in_s"])),
                 *[E.comment(_i) for _i in value["comments"] if _i]
             )
             for station_id, station_value in value["stations"].iteritems():
                 event.append(E.station(
                     E.station_id(station_id),
                     E.station_weight(str(station_value["station_weight"])),
-                    E.time_correction_in_s(str(
-                        station_value["time_correction_in_s"])),
                     *[E.comment(_i)
                       for _i in station_value["comments"] if _i]
                 ))
@@ -408,12 +374,10 @@ def create_iteration_xml_string(iteration_name, solver_name, events,
     for event_name, stations in events.iteritems():
         stations_doc = [E.station(
             E.station_id(station),
-            E.station_weight("1.0"),
-            E.time_correction_in_s("0.0")) for station in stations]
+            E.station_weight("1.0")) for station in stations]
         events_doc.append(E.event(
             E.event_name(event_name),
             E.event_weight("1.0"),
-            E.time_correction_in_s("0.0"),
             *stations_doc))
 
     doc = E.iteration(
@@ -424,11 +388,6 @@ def create_iteration_xml_string(iteration_name, solver_name, events,
         E.data_preprocessing(
             E.highpass_period(str(max_period)),
             E.lowpass_period(str(min_period))),
-        E.rejection_criteria(
-            E.minimum_trace_length_in_s("500.0"),
-            E.signal_to_noise(
-                E.test_interval_from_origin_in_s("100.0"),
-                E.max_amplitude_ratio("100.0"))),
         E.solver_parameters(
             E.solver(solver_name),
             solver_doc),
