@@ -431,7 +431,7 @@ def _plot_features(map_object, stepsize):
 
 
 def _plot_lines(map_object, lines, color, lw, alpha=1.0, label=None,
-                effects=False):
+                effects=False, **kwargs):
     import matplotlib.patheffects as PathEffects
 
     lines = np.array(lines)
@@ -465,4 +465,4 @@ def _plot_lines(map_object, lines, color, lw, alpha=1.0, label=None,
         if effects else None
 
     map_object.plot(lngs, lats, color=color, lw=lw, alpha=alpha,
-                    label=label, path_effects=path_effects)
+                    label=label, path_effects=path_effects, **kwargs)

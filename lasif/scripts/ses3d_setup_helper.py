@@ -50,10 +50,13 @@ def get_factors_and_multiplicity(number):
     Adapted from http://stackoverflow.com/a/24545330/1657047
     """
     factors = {}
-    for prime in get_primes(number):
+    # print(get_primes(number)) # all primes below number
+    for prime in get_primes(number): # all primes below number
         n = number
         factor = 0
         while True:
+            # print("prime is {}".format(prime))
+            # print("remainder is  {}".format(n % prime))
             if n % prime == 0:
                 factor += 1
                 n /= prime
@@ -73,6 +76,7 @@ def get_divisors(number):
     Adapted from http://stackoverflow.com/a/171784/1657047
     """
     factors = get_factors_and_multiplicity(number)
+    # print(factors)
     nfactors = len(factors)
     f = [0] * nfactors
     divisors = []
@@ -92,7 +96,8 @@ def get_divisors(number):
     return sorted(divisors)
 
 
-def get_domain_decompositions(nx, ny, nz, max_recommendations=5):
+def get_domain_decompositions(nx, ny, nz, n_max=25, max_recommendations=5):
+
     """
     Attempt to get reasonable domain decomposition recommendations.
 
@@ -102,6 +107,8 @@ def get_domain_decompositions(nx, ny, nz, max_recommendations=5):
     :type ny: int
     :param nz: Elements in z direction.
     :type nz: int
+    :param n_max: Maximum number of elements desired per processing unit
+    :type n_max: int
     :param max_recommendations: The maximum number of recommendations to
         return.
     :type max_recommendations: int
@@ -112,9 +119,9 @@ def get_domain_decompositions(nx, ny, nz, max_recommendations=5):
 
     # Don't have less than 4 or more than 20 elements per core in one
     # direction.
-    factors_x = [_i for _i in factors_x if 15 >= nx / _i >= 4]
-    factors_y = [_i for _i in factors_y if 15 >= ny / _i >= 4]
-    factors_z = [_i for _i in factors_z if 15 >= nz / _i >= 4]
+    factors_x = [_i for _i in factors_x if n_max >= nx / _i >= 4]
+    factors_y = [_i for _i in factors_y if n_max >= ny / _i >= 4]
+    factors_z = [_i for _i in factors_z if n_max >= nz / _i >= 4]
 
     # Get all possible combinations and choose then one with the smallest
     # standard deviation.
@@ -141,14 +148,14 @@ def get_domain_decompositions(nx, ny, nz, max_recommendations=5):
                   key=lambda x: np.array(x).prod())
 
 
-def get_ses3d_settings(dx, dy, dz, nx, ny, nz, max_recommendations):
+def get_ses3d_settings(Lx, Ly, Lz, nx, ny, nz, n_max=25, max_recommendations=5):
     print("SES3D Setup Assistant\n")
 
     print("All calculations are done quick and dirty so take them with a "
           "grain of salt.\n")
 
     decompositions = get_domain_decompositions(
-        nx, ny, nz, max_recommendations=max_recommendations)
+        nx, ny, nz, n_max=n_max, max_recommendations=max_recommendations)
     if not decompositions:
         print("Could not calculate recommended domain decompositions.")
         return
@@ -164,9 +171,9 @@ def get_ses3d_settings(dx, dy, dz, nx, ny, nz, max_recommendations):
                comp[1], ny / comp[1], comp[2], nz / comp[2]) +
               colorama.Style.RESET_ALL)
 
-        x_extent = dx * 111.32
-        y_extent = dy * 111.32
-        z_extent = dz
+        x_extent = Lx * 111.32
+        y_extent = Ly * 111.32
+        z_extent = Lz
         elem_size_x = x_extent / (nx + comp[0])
         elem_size_y = y_extent / (ny + comp[1])
         elem_size_z = z_extent / (nz + comp[2])
@@ -183,6 +190,8 @@ def get_ses3d_settings(dx, dy, dz, nx, ny, nz, max_recommendations):
         element_sizes = [elem_size_x, elem_size_y, elem_size_z]
         min_element_size = min(element_sizes)
         max_element_size = max(element_sizes)
+
+        print('minimum element size is '.format(min_element_size))
         # Smallest GLL point distance.
         dx_min = 0.1717 * min_element_size
 
