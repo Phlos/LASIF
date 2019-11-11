@@ -58,11 +58,17 @@ class RawSES3DModelHandler(object):
         * grad_csv_[XX]_[XXXX]
         * grad_rho_[XX]_[XXXX]
 
-    A wavefield directory contains the following files:
+    A wavefield directory (ses3d_4_1) contains the following files:
         * boxfile              -> File describing the discretization
         * vx_[xx]_[timestep]
         * vy_[xx]_[timestep]
         * vz_[xx]_[timestep]
+
+    A wavefield directory (ses3d_r07_b) contains the following files:
+        * boxfile              -> File describing the discretization
+        * vx_[xx]
+        * vy_[xx]
+        * vz_[xx]
     """
     def __init__(self, directory, domain, model_type="earth_model"):
         """
@@ -75,6 +81,7 @@ class RawSES3DModelHandler(object):
                 * earth_model - The standard SES3D model files (default)
                 * kernel - The kernels. Identifies by lots of grad_* files.
                 * wavefield - The raw wavefields.
+                * wavefield_r07_b - same, but in ses3d_r07_b style...
         """
         self.directory = directory
         self.boxfile = os.path.join(self.directory, "boxfile")
@@ -146,6 +153,79 @@ class RawSES3DModelHandler(object):
                             filenames,
                             key=lambda x: int(
                                 os.path.basename(x).split("_")[1]))}
+        elif model_type == "wavefield_r07_b":
+            components = ["vx", "vy", "vz"]
+            self.available_derived_components = []
+            self.components = {}
+            self.parsed_components = {}
+
+            # Getting the time steps (common to all components, or so we hope)
+            ###TODO: make less ugly.
+            def get_timesteps(self):
+
+              fn_vector = os.path.join(self.directory, 'saving_vector_0')
+
+              list_timesteps = []
+              with open(fn_vector) as f_vec:
+
+                first = int(f_vec.readline())
+                list_timesteps.append(first)
+                if first is not 1:
+                  print( 'ERROR: 1st line is not 1, the num_frames might be incorrect -- check your saving_vector file')
+                  return
+                multiple, final = None, None
+                for line in f_vec:
+                  if not line.startswith('0'):
+                    list_timesteps.append(int(line))
+                  if not multiple and not line.startswith('0'):
+                    multiple = int(line)
+                    # continue
+                # we find the last line as soon as the lines are exhausted:
+                final = int(line)
+
+              num_frames = final / multiple + 1
+              num_frames = int(num_frames)
+
+              return list_timesteps, num_frames
+
+            timesteps, num_frames = get_timesteps(self)
+
+            # print('len of timesteps: {}'.format(len(timesteps)))
+            # print('num of frames: {}'.format(num_frames))
+
+            for component in components:
+
+                files = glob.glob(os.path.join(directory, "{:s}_*".format(component) ))
+                # Sort the files by ascending number.
+                files.sort(key=lambda x: int(re.findall(r"\d+$",
+                                             (os.path.basename(x)))[0]))
+                if not files:
+                    print 'no files for {}'.format(component)
+                    continue
+
+                for _i, timestep in enumerate(timesteps):
+                    self.components['{} {}'.format(component, timestep)] = \
+                         {"filenames": files,
+                          "timestep":  timestep,
+                          "iframe":    _i}
+
+            ### Nienke's old version, no timestep info included.
+            # for component in components:
+            #     files = glob.glob(os.path.join(directory, "{:s}_*".format(component) ))
+            #     if not files:
+            #         print 'no files for {}'.format(component)
+            #         continue
+            #
+            #     ###TODO: get the time steps here
+            #
+            #     # Sort the files by ascending number.
+            #     files.sort(key=lambda x: int(re.findall(r"\d+$",
+            #                                  (os.path.basename(x)))[0]))
+            #     self.components[component] = {"filenames": files}
+
+
+
+
         elif model_type == "kernel":
             # Now check what different models are available in the directory.
             # This information is also used to infer the degree of the used
@@ -175,6 +255,9 @@ class RawSES3DModelHandler(object):
 
         # All files for a single component have the same size. Now check that
         # all files have the same size.
+        # print self.components
+        # print 'file size is {}'.format([os.path.getsize(_i["filenames"][0])
+        #                                for _i in self.components.itervalues()])
         unique_filesizes = len(list(set([
             os.path.getsize(_i["filenames"][0])
             for _i in self.components.itervalues()])))
@@ -190,6 +273,40 @@ class RawSES3DModelHandler(object):
         x, y, z = sd["index_x_count"], sd["index_y_count"], sd["index_z_count"]
         self.lagrange_polynomial_degree = \
             int(round(((size * 0.25) / (x * y * z)) ** (1.0 / 3.0) - 1))
+
+        ### TODO: make less ugly. This is a hack for the lagrange polynomial
+        ### degree of wavefields, which can probably be determined from the file
+        ### somehow, but since these files contain a whole set of snapshots, I
+        ### don't quite know how...
+        if model_type == 'wavefield_r07_b':
+
+            def read_lpd_from_conf(self, verbose=False):
+
+
+              fn_conf = os.path.join(self.directory, 'ses3d_conf.h')
+
+              if not os.path.exists(fn_conf):
+                  print('WARNING: ses3d_conf.h does not exist')
+
+              # read nx, ny, nz etc from ses3d_conf.h
+              with open(fn_conf) as f_conf:
+                fw_lpd = None
+                for line in f_conf:
+                  if not fw_lpd and line.startswith('#define fw_lpd'):
+                    fw_lpd = int(line.partition('fw_lpd')[2].split()[0])
+                    break
+
+              if verbose:
+                print( 'fw_lpd is {}'.format(fw_lpd))
+
+              return fw_lpd
+
+            # self.lagrange_polynomial_degree = read_lpd_from_conf(self)
+            try:
+              self.lagrange_polynomial_degree = read_lpd_from_conf(self)
+            except:
+              print 'WARNING: Something went wrong reading the LPD. Assuming LPD=4'
+              self.lagrange_polynomial_degree = 4
 
         self._calculate_final_dimensions()
 
@@ -233,6 +350,67 @@ class RawSES3DModelHandler(object):
         with open(filename, "rb") as open_file:
             field = np.ndarray(shape, buffer=open_file.read()[4:-4],
                                dtype="float32", order="F")
+
+        # Calculate the new shape by multiplying every dimension with lpd + 1
+        # value for every dimension.
+        new_shape = [_i * _j for _i, _j in zip(shape[:3], shape[3:])]
+
+        # Reorder the axes:
+        # v[x, y, z, lpd + 1 ,lpd + 1, lpd + 1] -> v[x, lpd + 1, y, z,
+        # lpd + 1, lpd + 1] -> v[x, lpd + 1, y, lpd + 1, z, lpd + 1]
+        field = np.rollaxis(np.rollaxis(field, 3, 1), 3, lpd + 1)
+
+        # Reshape the data:
+        # v[nx,lpd+1,ny,lpd+1,nz,lpd+1] to v[nx*(lpd+1),ny*(lpd+1),nz*(lpd+1)]
+        field = field.reshape(new_shape, order="C")
+
+        # XXX: Attempt to do this in one step.
+        for axis, count in enumerate(new_shape):
+            # Mask the duplicate values.
+            mask = np.ones(count, dtype="bool")
+            mask[::lpd + 1][1:] = False
+            # Remove them by compressing the array.
+            field = field.compress(mask, axis=axis)
+
+        return field[:, :, ::-1]
+
+    def _read_single_box_wavefield_r07_b(self, component, file_number):
+        """
+        This function reads Ses3ds raw binary files, exclusively for 3d velocity
+        field snapshots created with ses3d_r07_b (the C version of ses3d by
+        Alexey).
+        It returns the field as an array of rank 3 with shape (nx*lpd+1, ny*lpd+1,
+        nz*lpd+1), discarding the duplicates by default.
+        """
+        # Get the file and the corresponding domain.
+        filename = self.components[component]["filenames"][file_number]
+        # timestep = self.components[component][""]
+        i_frame = self.components[component]["iframe"]
+        domain = self.setup["subdomains"][file_number]
+
+        lpd = self.lagrange_polynomial_degree
+
+        shape = (domain["index_x_count"], domain["index_y_count"],
+                 domain["index_z_count"], lpd + 1, lpd + 1, lpd + 1)
+
+        frame_size = np.prod(shape)
+        # frame_size = (nx + 1) * (ny + 1) * (nz + 1) * (lpd + 1) * (lpd + 1) * (lpd + 1)
+
+        dt = np.dtype('f4') # data type: 4-bit float
+        with open(filename, "rb") as fp:
+          # random access
+          bytespervalue=4
+          # get the frame
+          fp.seek(i_frame*frame_size*bytespervalue)
+          frame = np.fromfile(fp, dt, frame_size)
+          # rework into the correct format
+          field = frame.reshape(shape)
+
+        # Take care: The first and last four bytes in the arrays are invalid
+        #  due to them being written by Fortran.
+        # with open(filename, "rb") as open_file:
+        #     field = np.ndarray(shape, buffer=open_file.read()[4:-4],
+        #                        dtype="float32", order="F")
 
         # Calculate the new shape by multiplying every dimension with lpd + 1
         # value for every dimension.
@@ -326,8 +504,13 @@ class RawSES3DModelHandler(object):
                                    for _j in (x_max, y_max, z_max)]
 
             # Merge into data.
-            data[x_min: x_max + 1, y_min: y_max + 1, z_min: z_max + 1] = \
-                self._read_single_box(component, _i)
+            ###TODO Make less ugly for wavefield_r07_b
+            if self.model_type == 'wavefield_r07_b':
+                data[x_min: x_max + 1, y_min: y_max + 1, z_min: z_max + 1] = \
+                    self._read_single_box_wavefield_r07_b(component, _i)
+            else:
+                data[x_min: x_max + 1, y_min: y_max + 1, z_min: z_max + 1] = \
+                    self._read_single_box(component, _i)
 
         self.parsed_components[component] = data
 
@@ -401,7 +584,8 @@ class RawSES3DModelHandler(object):
             return np.argmin(np.abs(self.collocation_points_lats[::-1] -
                                     value))
 
-    def plot_depth_slice(self, component, depth_in_km, m,
+    def plot_depth_slice(self, component, depth_in_km, m, cmap=None,
+                         cminmax=None,
                          absolute_values=True):
         """
         Plots a depth slice.
@@ -414,6 +598,9 @@ class RawSES3DModelHandler(object):
         :param m: Basemap instance.
         """
         depth_index = self.get_closest_gll_index("depth", depth_in_km)
+
+        if not cmap:
+          cmap = tomo_colormap
 
         # No need to do anything if the currently plotted slice is already
         # plotted. This is useful for interactive use when the desired depth
@@ -449,7 +636,7 @@ class RawSES3DModelHandler(object):
         depth_data = data[::-1, :, depth_index]
 
         # Plot values relative to AK135.
-        if not absolute_values:
+        if not absolute_values and not cminmax:
             cmp_map = {
                 "rho": "density",
                 "vp": "vp",
@@ -487,6 +674,9 @@ class RawSES3DModelHandler(object):
                     offset = offset.max()
                 vmin = -offset
                 vmax = offset
+        elif cminmax:
+            vmin = cminmax[0]
+            vmax = cminmax[1]
         else:
             vmin, vmax = depth_data.min(), depth_data.max()
             vmedian = np.median(depth_data)
@@ -505,8 +695,8 @@ class RawSES3DModelHandler(object):
             m._depth_slice.remove()
             del m._depth_slice
 
-        im = m.pcolormesh(x, y, depth_data, cmap=tomo_colormap, vmin=vmin,
-                          vmax=vmax)
+        im = m.pcolormesh(x, y, depth_data, cmap=cmap, vmin=vmin,
+                          vmax=vmax, shading='gouraud')
         m._depth_slice = im
 
         # Store what is currently plotted.
